@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Otimização de Receitas - Engenharia de Alimentos</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h1,
+    h2,
+    h3 {
+      color: #2c3e50;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+
+    th,
+    td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #3498db;
+      color: white;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    .tab {
+      overflow: hidden;
+      border: 1px solid #ccc;
+      background-color: #f1f1f1;
+      border-radius: 5px 5px 0 0;
+    }
+
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      transition: 0.3s;
+    }
+
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    .tab button.active {
+      background-color: #3498db;
+      color: white;
+    }
+
+    .tabcontent {
+      display: none;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-top: none;
+      border-radius: 0 0 5px 5px;
+      background: white;
+    }
+
+    .chart-container {
+      width: 100%;
+      height: 400px;
+      margin: 20px 0;
+    }
+
+    .ingredient-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .remove-btn {
+      background-color: #e74c3c;
+    }
+
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 0, 0, .3);
+      border-radius: 50%;
+      border-top-color: #3498db;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    .price-calculation {
+      background: #e8f4fc;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .auto-calc {
+      background-color: #e8f4fc;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Sistema de Otimização de Receitas</h1>
+    <p>Engenharia de Alimentos - Custo x Nutrientes x Qualidade</p>
+    <div class="tab"><button class="tablinks active" onclick="openTab(event, 'recipe')">Nova Receita</button><button
+        class="tablinks" onclick="openTab(event, 'optimize')">Otimização</button><button class="tablinks"
+        onclick="openTab(event, 'analysis')">Análise</button><button class="tablinks"
+        onclick="openTab(event, 'price')">Preço de Venda</button></div><!-- Aba de Receita -->
+    <div id="recipe" class="tabcontent" style="display: block;">
+      <div class="section">
+        <h2>Cadastro de Receita</h2>
+        <div><label for="recipe-name">Nome da Receita:</label><input type="text" id="recipe-name"
+            placeholder="Ex: Pão Integral"></div>
+        <div><label for="recipe-description">Descrição/Modo de Preparo:</label><textarea id="recipe-description"
+            rows="4"></textarea></div>
+      </div>
+      <div class="section">
+        <h2>Ingredientes</h2>
+        <div id="ingredients-container"><!-- Linhas de ingredientes serão adicionadas aqui -->
+        </div><button onclick="addIngredientRow()">+ Adicionar Ingrediente</button><button
+          onclick="fetchNutritionData()">Buscar Dados Nutricionais (API)</button>
+        <div id="nutrition-status" class="status"></div>
+      </div>
+      <div class="section">
+        <h2>Informações Nutricionais</h2>
+        <div class="auto-calc">
+          <p><strong>Valores calculados automaticamente</strong></p>
+        </div>
+        <div class="nutrition-facts">
+          <div><label for="serving-size">Tamanho da Porção (g):</label><input type="number" id="serving-size" min="1"
+              value="100" onchange="calculateNutrition()"></div>
+          <div><label for="calories">Calorias (kcal):</label><input type="number" id="calories" min="0" readonly></div>
+          <div><label for="protein">Proteína (g):</label><input type="number" id="protein" min="0" step="0.1" readonly>
+          </div>
+          <div><label for="carbs">Carboidratos (g):</label><input type="number" id="carbs" min="0" step="0.1" readonly>
+          </div>
+          <div><label for="fat">Gorduras (g):</label><input type="number" id="fat" min="0" step="0.1" readonly></div>
+          <div><label for="fiber">Fibras (g):</label><input type="number" id="fiber" min="0" step="0.1" readonly></div>
+          <div><label for="sodium">Sódio (mg):</label><input type="number" id="sodium" min="0" readonly></div>
+        </div>
+      </div><button onclick="saveRecipe()">Salvar Receita</button>
+      <div id="recipe-status" class="status"></div>
+    </div><!-- Aba de Otimização -->
+    <div id="optimize" class="tabcontent">
+      <div class="section">
+        <h2>Otimização de Formulação</h2>
+        <div><label for="optimization-goal">Objetivo de Otimização:</label><select id="optimization-goal"
+            onchange="updateRestrictions()">
+            <option value="cost">Minimizar Custo</option>
+            <option value="nutrition">Maximizar Valor Nutricional</option>
+            <option value="balance">Equilíbrio Custo-Nutrição</option>
+          </select></div>
+        <h3>Restrições</h3>
+        <div class="auto-calc">
+          <p><strong>Valores sugeridos automaticamente</strong></p>
+        </div>
+        <div><label for="min-protein">Proteína Mínima (%):</label><input type="number" id="min-protein" min="0"
+            max="100" step="0.1" onchange="updateOptimization()"></div>
+        <div><label for="max-fat">Gordura Máxima (%):</label><input type="number" id="max-fat" min="0" max="100"
+            step="0.1" onchange="updateOptimization()"></div>
+        <div><label for="max-sugar">Açúcar Máximo (%):</label><input type="number" id="max-sugar" min="0" max="100"
+            step="0.1" onchange="updateOptimization()"></div>
+        <div><label for="max-sodium">Sódio Máximo (mg/100g):</label><input type="number" id="max-sodium" min="0"
+            onchange="updateOptimization()"></div>
+        <div><label for="max-cost">Custo Máximo (R$/kg):</label><input type="number" id="max-cost" min="0" step="0.01"
+            onchange="updateOptimization()"></div><button onclick="optimizeRecipe()">Otimizar Receita</button>
+        <div id="optimization-status" class="status"></div>
+      </div>
+      <div class="section">
+        <h2>Resultados da Otimização</h2>
+        <div id="optimization-results"></div>
+        <div id="optimization-chart" class="chart-container"></div><button id="save-optimization-btn"
+          style="display: none;" onclick="saveOptimizedRecipe()">Salvar Receita Otimizada</button><button
+          id="export-pdf-btn" style="display: none;" onclick="exportToPDF()">Exportar para PDF</button><button
+          id="export-excel-btn" style="display: none;" onclick="exportToExcel()">Exportar para Excel</button>
+      </div>
+    </div><!-- Aba de Análise -->
+    <div id="analysis" class="tabcontent">
+      <div class="section">
+        <h2>Análise de Sensibilidade</h2>
+        <div><label for="sensitivity-parameter">Parâmetro para Análise:</label><select id="sensitivity-parameter"
+            onchange="updateSensitivityInputs()">
+            <option value="protein">Proteína Mínima</option>
+            <option value="fat">Gordura Máxima</option>
+            <option value="sugar">Açúcar Máximo</option>
+            <option value="sodium">Sódio Máximo</option>
+            <option value="cost">Custo Máximo</option>
+          </select></div>
+        <div><label for="sensitivity-min">Valor Mínimo:</label><input type="number" id="sensitivity-min" step="0.1"
+            onchange="updateSensitivityAnalysis()"></div>
+        <div><label for="sensitivity-max">Valor Máximo:</label><input type="number" id="sensitivity-max" step="0.1"
+            onchange="updateSensitivityAnalysis()"></div>
+        <div><label for="sensitivity-steps">Número de Passos:</label><input type="number" id="sensitivity-steps" min="3"
+            max="20" value="5" onchange="updateSensitivityAnalysis()"></div><button
+          onclick="runSensitivityAnalysis()">Executar Análise</button>
+        <div id="sensitivity-status" class="status"></div>
+      </div>
+      <div class="section">
+        <h2>Resultados da Análise</h2>
+        <div id="sensitivity-chart" class="chart-container"></div>
+        <div id="sensitivity-results"></div><button id="export-sensitivity-btn" style="display: none;"
+          onclick="exportSensitivityData()">Exportar Dados</button>
+      </div>
+    </div><!-- Aba de Preço de Venda -->
+    <div id="price" class="tabcontent">
+      <div class="section">
+        <h2>Cálculo de Preço de Venda</h2>
+        <div><label for="production-cost">Custo de Produção (R$/kg):</label><input type="number" id="production-cost"
+            min="0" step="0.01" onchange="calculateSellingPrice()"></div>
+        <div><label for="desired-margin">Margem de Lucro Desejada (%):</label><input type="number" id="desired-margin"
+            min="0" max="100" step="0.1" value="30" onchange="calculateSellingPrice()"></div>
+        <div><label for="taxes">Impostos e Taxas (%):</label><input type="number" id="taxes" min="0" max="100"
+            step="0.1" value="15" onchange="calculateSellingPrice()"></div>
+        <div><label for="packaging-cost">Custo de Embalagem (R$/unidade):</label><input type="number"
+            id="packaging-cost" min="0" step="0.01" value="0.50" onchange="calculateSellingPrice()"></div>
+        <div><label for="product-weight">Peso do Produto (g/unidade):</label><input type="number" id="product-weight"
+            min="1" value="100" onchange="calculateSellingPrice()"></div><button
+          onclick="calculateSellingPrice()">Calcular Preço de Venda</button>
+        <div id="price-status" class="status"></div>
+      </div>
+      <div class="section price-calculation">
+        <h2>Resultado do Cálculo</h2>
+        <div id="price-results"></div>
+        <div id="price-chart" class="chart-container"></div><button id="export-price-btn" style="display: none;"
+          onclick="exportPriceData()">Exportar Dados</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Dados globais
+    let recipes = JSON.parse(localStorage.getItem('recipes')) || [];
+    let currentRecipe = {};
+    let optimizationResults = null;
+    let sensitivityResults = null;
+    const { jsPDF } = window.jspdf;
+
+    // Banco de dados nutricional simplificado
+    const nutritionDatabase = {
+      "farinha de trigo": { protein: 10.3, fat: 1.0, carbs: 76.1, fiber: 2.7, sugar: 0.3, sodium: 2, calories: 364 },
+      "açúcar": { protein: 0, fat: 0, carbs: 100, fiber: 0, sugar: 100, sodium: 1, calories: 387 },
+      "ovo": { protein: 12.6, fat: 9.5, carbs: 0.7, fiber: 0, sugar: 0.7, sodium: 142, calories: 143 },
+      "leite": { protein: 3.4, fat: 1.0, carbs: 4.8, fiber: 0, sugar: 4.8, sodium: 44, calories: 42 },
+      "manteiga": { protein: 0.9, fat: 81.1, carbs: 0.1, fiber: 0, sugar: 0.1, sodium: 11, calories: 717 },
+      "sal": { protein: 0, fat: 0, carbs: 0, fiber: 0, sugar: 0, sodium: 38758, calories: 0 },
+      "fermento": { protein: 40.2, fat: 5.1, carbs: 18.1, fiber: 25.5, sugar: 0, sodium: 107, calories: 280 }
+    };
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', function () {
+      addIngredientRow();
+      updateSensitivityInputs();
+
+      // Carregar receitas salvas
+      if (recipes.length > 0) {
+        currentRecipe = recipes[recipes.length - 1];
+        loadRecipe(currentRecipe);
+      }
+    });
+
+    // Funções de UI
+    function openTab(evt, tabName) {
+      const tabcontent = document.getElementsByClassName("tabcontent");
+      for (let i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+
+      const tablinks = document.getElementsByClassName("tablinks");
+      for (let i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+
+      // Atualizar cálculos quando mudar de aba
+      if (tabName === 'recipe') calculateNutrition();
+      if (tabName === 'optimize') updateRestrictions();
+      if (tabName === 'analysis') updateSensitivityAnalysis();
+      if (tabName === 'price') calculateSellingPrice();
+    }
+
+    function addIngredientRow() {
+      const container = document.getElementById('ingredients-container');
+      const rowId = Date.now();
+
+      const row = document.createElement('div');
+      row.className = 'ingredient-row';
+      row.id = `ingredient-${rowId}`;
+
+      row.innerHTML = `
+                <input type="text" placeholder="Nome" id="ing-name-${rowId}" style="flex: 2;" onchange="updateIngredientNutrition('${rowId}')"><input type="number" placeholder="Quantidade (g)" id="ing-qty-${rowId}" min="0" step="1" style="flex: 1;" onchange="calculateNutrition()"><input type="number" placeholder="Preço (R$/kg)" id="ing-price-${rowId}" min="0" step="0.01" style="flex: 1;" onchange="calculateNutrition()"><input type="number" placeholder="Proteína (%)" id="ing-protein-${rowId}" min="0" max="100" step="0.1" style="flex: 1;" onchange="calculateNutrition()"><input type="number" placeholder="Gordura (%)" id="ing-fat-${rowId}" min="0" max="100" step="0.1" style="flex: 1;" onchange="calculateNutrition()"><input type="number" placeholder="Açúcar (%)" id="ing-sugar-${rowId}" min="0" max="100" step="0.1" style="flex: 1;" onchange="calculateNutrition()"><button class="remove-btn" onclick="removeIngredientRow('ingredient-${rowId}')">×</button>
+            `;
+
+      container.appendChild(row);
+    }
+
+    function removeIngredientRow(id) {
+      const row = document.getElementById(id);
+      if (row) row.remove();
+      calculateNutrition();
+    }
+
+    function showStatus(message, type = 'success', elementId = 'recipe-status') {
+      const element = document.getElementById(elementId);
+      element.innerHTML = `<div class="status ${type}">${message}</div>`;
+      setTimeout(() => element.innerHTML = '', 5000);
+    }
+
+    // Funções de cálculo automático
+    function updateIngredientNutrition(rowId) {
+      const name = document.getElementById(`ing-name-${rowId}`).value.toLowerCase();
+      const nutrition = nutritionDatabase[name];
+
+      if (nutrition) {
+        document.getElementById(`ing-protein-${rowId}`).value = nutrition.protein;
+        document.getElementById(`ing-fat-${rowId}`).value = nutrition.fat;
+        document.getElementById(`ing-sugar-${rowId}`).value = nutrition.sugar;
+      }
+      calculateNutrition();
+    }
+
+    function calculateNutrition() {
+      const ingredientRows = document.querySelectorAll('.ingredient-row');
+      let totalWeight = 0;
+      let totalCost = 0;
+      let nutrition = {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        sodium: 0
+      };
+
+      ingredientRows.forEach(row => {
+        const id = row.id.split('-')[1];
+        const quantity = parseFloat(document.getElementById(`ing-qty-${id}`).value) || 0;
+        const price = parseFloat(document.getElementById(`ing-price-${id}`).value) || 0;
+        const protein = parseFloat(document.getElementById(`ing-protein-${id}`).value) || 0;
+        const fat = parseFloat(document.getElementById(`ing-fat-${id}`).value) || 0;
+        const sugar = parseFloat(document.getElementById(`ing-sugar-${id}`).value) || 0;
+
+        // Obter dados nutricionais completos do banco de dados
+        const name = document.getElementById(`ing-name-${id}`).value.toLowerCase();
+        const ingNutrition = nutritionDatabase[name] || {
+          protein, fat, sugar,
+          carbs: 0, fiber: 0, sodium: 0, calories: 0
+        };
+
+        totalWeight += quantity;
+        totalCost += (quantity * price / 1000); // Convertendo preço/kg para preço total
+
+        // Calcular valores nutricionais totais
+        const factor = quantity / 100; // Porque os valores são para 100g
+        nutrition.calories += (ingNutrition.calories || 0) * factor;
+        nutrition.protein += (ingNutrition.protein || 0) * factor;
+        nutrition.carbs += (ingNutrition.carbs || 0) * factor;
+        nutrition.fat += (ingNutrition.fat || 0) * factor;
+        nutrition.fiber += (ingNutrition.fiber || 0) * factor;
+        nutrition.sodium += (ingNutrition.sodium || 0) * factor;
+      });
+
+      // Atualizar campos nutricionais
+      document.getElementById('calories').value = nutrition.calories.toFixed(1);
+      document.getElementById('protein').value = nutrition.protein.toFixed(1);
+      document.getElementById('carbs').value = nutrition.carbs.toFixed(1);
+      document.getElementById('fat').value = nutrition.fat.toFixed(1);
+      document.getElementById('fiber').value = nutrition.fiber.toFixed(1);
+      document.getElementById('sodium').value = nutrition.sodium.toFixed(1);
+
+      // Atualizar restrições na aba de otimização
+      updateRestrictions();
+    }
+
+    function updateRestrictions() {
+      const ingredientRows = document.querySelectorAll('.ingredient-row');
+      let totalWeight = 0;
+      let totalProtein = 0;
+      let totalFat = 0;
+      let totalSugar = 0;
+      let totalCost = 0;
+
+      ingredientRows.forEach(row => {
+        const id = row.id.split('-')[1];
+        const quantity = parseFloat(document.getElementById(`ing-qty-${id}`).value) || 0;
+        const price = parseFloat(document.getElementById(`ing-price-${id}`).value) || 0;
+        const protein = parseFloat(document.getElementById(`ing-protein-${id}`).value) || 0;
+        const fat = parseFloat(document.getElementById(`ing-fat-${id}`).value) || 0;
+        const sugar = parseFloat(document.getElementById(`ing-sugar-${id}`).value) || 0;
+
+        totalWeight += quantity;
+        totalProtein += (quantity * protein / 100);
+        totalFat += (quantity * fat / 100);
+        totalSugar += (quantity * sugar / 100);
+        totalCost += (quantity * price / 1000);
+      });
+
+      if (totalWeight > 0) {
+        // Definir valores sugeridos automaticamente
+        document.getElementById('min-protein').value = ((totalProtein / totalWeight) * 100 * 0.9).toFixed(1); // 90% do valor atual
+        document.getElementById('max-fat').value = ((totalFat / totalWeight) * 100 * 1.1).toFixed(1); // 110% do valor atual
+        document.getElementById('max-sugar').value = ((totalSugar / totalWeight) * 100 * 1.1).toFixed(1); // 110% do valor atual
+        document.getElementById('max-cost').value = ((totalCost / (totalWeight / 1000)) * 1.2).toFixed(2); // 120% do custo atual
+      }
+
+      // Atualizar otimização se já houver resultados
+      if (optimizationResults) {
+        updateOptimization();
+      }
+    }
+
+    function updateOptimization() {
+      if (document.getElementById('optimize').style.display === 'block') {
+        optimizeRecipe();
+      }
+    }
+
+    function updateSensitivityInputs() {
+      const param = document.getElementById('sensitivity-parameter').value;
+      const minInput = document.getElementById('sensitivity-min');
+      const maxInput = document.getElementById('sensitivity-max');
+
+      // Obter valores atuais das restrições
+      let currentValue = 0;
+      if (param === 'protein') {
+        currentValue = parseFloat(document.getElementById('min-protein').value) || 0;
+      } else if (param === 'fat' || param === 'sugar') {
+        currentValue = parseFloat(document.getElementById(`max-${param}`).value) || 0;
+      } else if (param === 'sodium') {
+        currentValue = parseFloat(document.getElementById('max-sodium').value) || 0;
+      } else if (param === 'cost') {
+        currentValue = parseFloat(document.getElementById('max-cost').value) || 0;
+      }
+
+      if (param === 'sodium') {
+        minInput.value = Math.max(0, currentValue * 0.5).toFixed(0);
+        maxInput.value = (currentValue * 1.5).toFixed(0);
+        minInput.step = '10';
+        maxInput.step = '10';
+      } else if (param === 'cost') {
+        minInput.value = (currentValue * 0.7).toFixed(2);
+        maxInput.value = (currentValue * 1.3).toFixed(2);
+        minInput.step = '0.5';
+        maxInput.step = '0.5';
+      } else {
+        minInput.value = (currentValue * 0.7).toFixed(1);
+        maxInput.value = (currentValue * 1.3).toFixed(1);
+        minInput.step = '0.1';
+        maxInput.step = '0.1';
+      }
+
+      updateSensitivityAnalysis();
+    }
+
+    function updateSensitivityAnalysis() {
+      if (document.getElementById('analysis').style.display === 'block' && sensitivityResults) {
+        runSensitivityAnalysis();
+      }
+    }
+
+    // Funções de receita
+    function saveRecipe() {
+      // Coletar dados da receita
+      const recipeName = document.getElementById('recipe-name').value;
+      const recipeDescription = document.getElementById('recipe-description').value;
+
+      if (!recipeName) {
+        showStatus("Por favor, insira um nome para a receita", 'error');
+        return;
+      }
+
+      // Coletar ingredientes
+      const ingredientRows = document.querySelectorAll('.ingredient-row');
+      const ingredients = [];
+
+      ingredientRows.forEach(row => {
+        const id = row.id.split('-')[1];
+        const name = document.getElementById(`ing-name-${id}`).value;
+        const quantity = parseFloat(document.getElementById(`ing-qty-${id}`).value);
+        const price = parseFloat(document.getElementById(`ing-price-${id}`).value);
+        const protein = parseFloat(document.getElementById(`ing-protein-${id}`).value) / 100;
+        const fat = parseFloat(document.getElementById(`ing-fat-${id}`).value) / 100;
+        const sugar = parseFloat(document.getElementById(`ing-sugar-${id}`).value) / 100;
+
+        if (name && !isNaN(quantity) && quantity > 0) {
+          ingredients.push({
+            name, quantity, price, protein, fat, sugar
+          });
+        }
+      });
+
+      if (ingredients.length === 0) {
+        showStatus("Adicione pelo menos um ingrediente válido", 'error');
+        return;
+      }
+
+      // Coletar informações nutricionais
+      const servingSize = parseFloat(document.getElementById('serving-size').value);
+      const nutrition = {
+        calories: parseFloat(document.getElementById('calories').value),
+        protein: parseFloat(document.getElementById('protein').value),
+        carbs: parseFloat(document.getElementById('carbs').value),
+        fat: parseFloat(document.getElementById('fat').value),
+        fiber: parseFloat(document.getElementById('fiber').value),
+        sodium: parseFloat(document.getElementById('sodium').value)
+      };
+
+      // Criar objeto de receita
+      currentRecipe = {
+        name: recipeName,
+        description: recipeDescription,
+        ingredients,
+        servingSize,
+        nutrition,
+        timestamp: new Date().toISOString()
+      };
+
+      // Salvar no armazenamento local
+      recipes.push(currentRecipe);
+      localStorage.setItem('recipes', JSON.stringify(recipes));
+
+      showStatus("Receita salva com sucesso!");
+    }
+
+    function loadRecipe(recipe) {
+      document.getElementById('recipe-name').value = recipe.name;
+      document.getElementById('recipe-description').value = recipe.description;
+
+      // Limpar ingredientes existentes
+      document.getElementById('ingredients-container').innerHTML = '';
+
+      // Adicionar ingredientes da receita
+      recipe.ingredients.forEach(ing => {
+        addIngredientRow();
+        const rows = document.querySelectorAll('.ingredient-row');
+        const lastRow = rows[rows.length - 1];
+        const id = lastRow.id.split('-')[1];
+
+        document.getElementById(`ing-name-${id}`).value = ing.name;
+        document.getElementById(`ing-qty-${id}`).value = ing.quantity;
+        document.getElementById(`ing-price-${id}`).value = ing.price;
+        document.getElementById(`ing-protein-${id}`).value = ing.protein * 100;
+        document.getElementById(`ing-fat-${id}`).value = ing.fat * 100;
+        document.getElementById(`ing-sugar-${id}`).value = ing.sugar * 100;
+      });
+
+      // Carregar informações nutricionais
+      document.getElementById('serving-size').value = recipe.servingSize;
+      calculateNutrition();
+    }
+
+    async function fetchNutritionData() {
+      const ingredientRows = document.querySelectorAll('.ingredient-row');
+      const statusElement = document.getElementById('nutrition-status');
+
+      for (const row of ingredientRows) {
+        const id = row.id.split('-')[1];
+        const nameInput = document.getElementById(`ing-name-${id}`);
+        const name = nameInput.value.trim();
+
+        if (!name) continue;
+
+        try {
+          statusElement.innerHTML = `<div class="status">Buscando dados para ${name}... <span class="loading"></span></div>`;
+
+          // Simular busca de dados nutricionais
+          const nutritionData = await simulateNutritionAPI(name);
+
+          if (nutritionData) {
+            document.getElementById(`ing-protein-${id}`).value = nutritionData.protein;
+            document.getElementById(`ing-fat-${id}`).value = nutritionData.fat;
+            document.getElementById(`ing-sugar-${id}`).value = nutritionData.sugar;
+            showStatus(`Dados nutricionais encontrados para ${name}`, 'success', 'nutrition-status');
+            calculateNutrition();
+          } else {
+            showStatus(`Nenhum dado encontrado para ${name} - preencha manualmente`, 'error', 'nutrition-status');
+          }
+        } catch (error) {
+          showStatus(`Erro ao buscar dados para ${name}: ${error.message}`, 'error', 'nutrition-status');
+        }
+      }
+    }
+
+    async function simulateNutritionAPI(ingredientName) {
+      // Simulação de API - na prática, integrar com Nutritionix ou similar
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const key = ingredientName.toLowerCase();
+      for (const [name, data] of Object.entries(nutritionDatabase)) {
+        if (key.includes(name)) {
+          return {
+            protein: data.protein,
+            fat: data.fat,
+            sugar: data.sugar
+          };
+        }
+      }
+
+      return null;
+    }
+
+    // Funções de otimização
+    function optimizeRecipe() {
+      const ingredientRows = document.querySelectorAll('.ingredient-row');
+      const ingredients = [];
+
+      ingredientRows.forEach(row => {
+        const id = row.id.split('-')[1];
+        const name = document.getElementById(`ing-name-${id}`).value;
+        const quantity = parseFloat(document.getElementById(`ing-qty-${id}`).value) || 0;
+        const price = parseFloat(document.getElementById(`ing-price-${id}`).value) || 0;
+        const protein = parseFloat(document.getElementById(`ing-protein-${id}`).value) / 100 || 0;
+        const fat = parseFloat(document.getElementById(`ing-fat-${id}`).value) / 100 || 0;
+        const sugar = parseFloat(document.getElementById(`ing-sugar-${id}`).value) / 100 || 0;
+
+        if (name && quantity > 0) {
+          ingredients.push({
+            name, quantity, price, protein, fat, sugar
+          });
+        }
+      });
+
+      if (ingredients.length < 2) {
+        showStatus("Primeiro crie uma receita com pelo menos 2 ingredientes", 'error', 'optimization-status');
+        return;
+      }
+
+      const goal = document.getElementById('optimization-goal').value;
+      const constraints = {
+        protein: parseFloat(document.getElementById('min-protein').value) / 100 || 0,
+        fat: parseFloat(document.getElementById('max-fat').value) / 100 || 100,
+        sugar: parseFloat(document.getElementById('max-sugar').value) / 100 || 100,
+        sodium: parseFloat(document.getElementById('max-sodium').value) || Infinity,
+        cost: parseFloat(document.getElementById('max-cost').value) || Infinity
+      };
+
+      try {
+        optimizationResults = simulateOptimization(ingredients, goal, constraints);
+        displayOptimizationResults(optimizationResults);
+        document.getElementById('save-optimization-btn').style.display = 'inline-block';
+        document.getElementById('export-pdf-btn').style.display = 'inline-block';
+        document.getElementById('export-excel-btn').style.display = 'inline-block';
+        showStatus("Otimização concluída com sucesso!", 'success', 'optimization-status');
+      } catch (error) {
+        showStatus(`Erro na otimização: ${error.message}`, 'error', 'optimization-status');
+      }
+    }
+
+    function simulateOptimization(ingredients, goal, constraints) {
+      const results = {
+        original: {},
+        optimized: {},
+        costReduction: 0,
+        nutritionImprovement: 0,
+        ingredients: []
+      };
+
+      // Calcular valores originais
+      let totalWeight = ingredients.reduce((sum, ing) => sum + ing.quantity, 0);
+      let originalCost = ingredients.reduce((sum, ing) => sum + (ing.quantity * ing.price / 1000), 0);
+      let originalProtein = ingredients.reduce((sum, ing) => sum + (ing.quantity * ing.protein), 0) / totalWeight;
+      let originalFat = ingredients.reduce((sum, ing) => sum + (ing.quantity * ing.fat), 0) / totalWeight;
+      let originalSugar = ingredients.reduce((sum, ing) => sum + (ing.quantity * ing.sugar), 0) / totalWeight;
+
+      results.original = {
+        cost: originalCost,
+        protein: originalProtein * 100,
+        fat: originalFat * 100,
+        sugar: originalSugar * 100
+      };
+
+      // Criar proporções otimizadas baseadas no objetivo
+      const optimizedIngredients = [...ingredients];
+      const totalPrice = optimizedIngredients.reduce((sum, ing) => sum + ing.price, 0);
+      const avgPrice = totalPrice / optimizedIngredients.length;
+
+      optimizedIngredients.forEach(ing => {
+        let factor = 1;
+
+        if (goal === 'cost') {
+          // Reduzir proporção de ingredientes caros
+          factor = 1 - (ing.price - avgPrice) / (totalPrice * 0.5);
+        } else if (goal === 'nutrition') {
+          // Aumentar proporção de ingredientes nutritivos
+          const nutritionScore = ing.protein * 2 - ing.fat - ing.sugar;
+          factor = 1 + nutritionScore * 0.5;
+        } else { // balance
+          // Equilíbrio entre custo e nutrição
+          const nutritionScore = ing.protein * 2 - ing.fat - ing.sugar;
+          const costFactor = 1 - (ing.price - avgPrice) / (totalPrice * 0.5);
+          factor = (costFactor + nutritionScore * 0.3) * 0.8;
+        }
+
+        // Aplicar fator com limites
+        ing.optimizedQty = Math.max(ing.quantity * 0.1, Math.min(ing.quantity * 2, ing.quantity * factor));
+      });
+
+      // Normalizar para manter o peso total
+      const optimizedTotal = optimizedIngredients.reduce((sum, ing) => sum + ing.optimizedQty, 0);
+      const normalizationFactor = totalWeight / optimizedTotal;
+
+      optimizedIngredients.forEach(ing => {
+        ing.optimizedQty *= normalizationFactor;
+        ing.optimizedCost = ing.optimizedQty * ing.price / 1000;
+        ing.optimizedPercent = (ing.optimizedQty / totalWeight) * 100;
+        ing.originalPercent = (ing.quantity / totalWeight) * 100;
+
+        results.ingredients.push({
+          name: ing.name,
+          originalQty: ing.quantity,
+          originalPercent: ing.originalPercent,
+          optimizedQty: ing.optimizedQty,
+          optimizedPercent: ing.optimizedPercent,
+          price: ing.price,
+          protein: ing.protein * 100,
+          fat: ing.fat * 100,
+          sugar: ing.sugar * 100
+        });
+      });
+
+      // Calcular resultados otimizados
+      const optimizedCost = optimizedIngredients.reduce((sum, ing) => sum + ing.optimizedCost, 0);
+      const optimizedProtein = optimizedIngredients.reduce((sum, ing) => sum + (ing.optimizedQty * ing.protein), 0) / totalWeight;
+      const optimizedFat = optimizedIngredients.reduce((sum, ing) => sum + (ing.optimizedQty * ing.fat), 0) / totalWeight;
+      const optimizedSugar = optimizedIngredients.reduce((sum, ing) => sum + (ing.optimizedQty * ing.sugar), 0) / totalWeight;
+
+      results.optimized = {
+        cost: optimizedCost,
+        protein: optimizedProtein * 100,
+        fat: optimizedFat * 100,
+        sugar: optimizedSugar * 100
+      };
+
+      results.costReduction = ((originalCost - optimizedCost) / originalCost) * 100;
+      results.nutritionImprovement = ((optimizedProtein - originalProtein) / originalProtein) * 100;
+
+      return results;
+    }
+
+    function displayOptimizationResults(results) {
+      // Tabela de comparação
+      let html = `
+                <h3>Comparação: Original vs Otimizado</h3><table><tr><th>Parâmetro</th><th>Original</th><th>Otimizado</th><th>Diferença</th></tr><tr><td>Custo Total (R$)</td><td>${results.original.cost.toFixed(2)}</td><td>${results.optimized.cost.toFixed(2)}</td><td>${(results.optimized.cost - results.original.cost).toFixed(2)} (${results.costReduction.toFixed(1)}%)</td></tr><tr><td>Proteína (%)</td><td>${results.original.protein.toFixed(1)}</td><td>${results.optimized.protein.toFixed(1)}</td><td>${(results.optimized.protein - results.original.protein).toFixed(1)} (${results.nutritionImprovement.toFixed(1)}%)</td></tr><tr><td>Gordura (%)</td><td>${results.original.fat.toFixed(1)}</td><td>${results.optimized.fat.toFixed(1)}</td><td>${(results.optimized.fat - results.original.fat).toFixed(1)}</td></tr><tr><td>Açúcar (%)</td><td>${results.original.sugar.toFixed(1)}</td><td>${results.optimized.sugar.toFixed(1)}</td><td>${(results.optimized.sugar - results.original.sugar).toFixed(1)}</td></tr></table>
+
+                <h3>Composição dos Ingredientes</h3><table><tr><th>Ingrediente</th><th>Original (%)</th><th>Otimizado (%)</th><th>Diferença</th><th>Preço (R$/kg)</th></tr>
+            `;
+
+      results.ingredients.forEach(ing => {
+        html += `
+                    <tr><td>${ing.name}</td><td>${ing.originalPercent.toFixed(1)}</td><td>${ing.optimizedPercent.toFixed(1)}</td><td>${(ing.optimizedPercent - ing.originalPercent).toFixed(1)}</td><td>${ing.price.toFixed(2)}</td></tr>
+                `;
+      });
+
+      html += `</table>`;
+      document.getElementById('optimization-results').innerHTML = html;
+
+      // Gráfico de comparação
+      const ctx = document.getElementById('optimization-chart');
+      ctx.innerHTML = '';
+      const canvas = document.createElement('canvas');
+      ctx.appendChild(canvas);
+
+      new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: ['Custo (R$)', 'Proteína (%)', 'Gordura (%)', 'Açúcar (%)'],
+          datasets: [
+            {
+              label: 'Original',
+              data: [
+                results.original.cost,
+                results.original.protein,
+                results.original.fat,
+                results.original.sugar
+              ],
+              backgroundColor: 'rgba(54, 162, 235, 0.5)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              borderWidth: 1
+            },
+            {
+              label: 'Otimizado',
+              data: [
+                results.optimized.cost,
+                results.optimized.protein,
+                results.optimized.fat,
+                results.optimized.sugar
+              ],
+              backgroundColor: 'rgba(75, 192, 192, 0.5)',
+              borderColor: 'rgba(75, 192, 192, 1)',
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    function saveOptimizedRecipe() {
+      if (!optimizationResults) return;
+
+      // Criar nova receita com os ingredientes otimizados
+      const optimizedRecipe = {
+        ...currentRecipe,
+        name: currentRecipe.name + " (Otimizada)",
+        ingredients: optimizationResults.ingredients.map(ing => ({
+          name: ing.name,
+          quantity: ing.optimizedQty,
+          price: ing.price,
+          protein: ing.protein / 100,
+          fat: ing.fat / 100,
+          sugar: ing.sugar / 100
+        })),
+        timestamp: new Date().toISOString()
+      };
+
+      // Atualizar informações nutricionais
+      optimizedRecipe.nutrition = {
+        protein: optimizationResults.optimized.protein,
+        fat: optimizationResults.optimized.fat,
+        sugar: optimizationResults.optimized.sugar,
+        calories: currentRecipe.nutrition.calories,
+        carbs: currentRecipe.nutrition.carbs,
+        fiber: currentRecipe.nutrition.fiber,
+        sodium: currentRecipe.nutrition.sodium
+      };
+
+      // Salvar no armazenamento local
+      recipes.push(optimizedRecipe);
+      localStorage.setItem('recipes', JSON.stringify(recipes));
+
+      showStatus("Receita otimizada salva com sucesso!", 'success', 'optimization-status');
+    }
+
+    // Funções de exportação
+    function exportToPDF() {
+      if (!optimizationResults) return;
+
+      const doc = new jsPDF();
+      const date = new Date().toLocaleString();
+
+      // Título
+      doc.setFontSize(18);
+      doc.text('Relatório de Otimização de Receita', 105, 20, { align: 'center' });
+      doc.setFontSize(12);
+      doc.text(`Receita: ${currentRecipe.name}`, 14, 30);
+      doc.text(`Gerado em: ${date}`, 14, 40);
+
+      // Resultados
+      doc.setFontSize(14);
+      doc.text('Comparação Original vs Otimizado:', 14, 60);
+
+      // Tabela de comparação
+      const comparisonData = [
+        ['Parâmetro', 'Original', 'Otimizado', 'Diferença'],
+        ['Custo (R$)',
+          optimizationResults.original.cost.toFixed(2),
+          optimizationResults.optimized.cost.toFixed(2),
+          `${(optimizationResults.optimized.cost - optimizationResults.original.cost).toFixed(2)} (${optimizationResults.costReduction.toFixed(1)}%)`],
+        ['Proteína (%)',
+          optimizationResults.original.protein.toFixed(1),
+          optimizationResults.optimized.protein.toFixed(1),
+          `${(optimizationResults.optimized.protein - optimizationResults.original.protein).toFixed(1)} (${optimizationResults.nutritionImprovement.toFixed(1)}%)`],
+        ['Gordura (%)',
+          optimizationResults.original.fat.toFixed(1),
+          optimizationResults.optimized.fat.toFixed(1),
+          (optimizationResults.optimized.fat - optimizationResults.original.fat).toFixed(1)],
+        ['Açúcar (%)',
+          optimizationResults.original.sugar.toFixed(1),
+          optimizationResults.optimized.sugar.toFixed(1),
+          (optimizationResults.optimized.sugar - optimizationResults.original.sugar).toFixed(1)]
+      ];
+
+      doc.autoTable({
+        startY: 70,
+        head: [comparisonData[0]],
+        body: comparisonData.slice(1),
+        theme: 'grid',
+        headStyles: { fillColor: [52, 152, 219] }
+      });
+
+      // Composição dos ingredientes
+      doc.setFontSize(14);
+      doc.text('Composição dos Ingredientes:', 14, doc.autoTable.previous.finalY + 20);
+
+      const ingredientsData = optimizationResults.ingredients.map(ing => [
+        ing.name,
+        `${ing.originalPercent.toFixed(1)}%`,
+        `${ing.optimizedPercent.toFixed(1)}%`,
+        `${(ing.optimizedPercent - ing.originalPercent).toFixed(1)}%`,
+        `R$${ing.price.toFixed(2)}`
+      ]);
+
+      doc.autoTable({
+        startY: doc.autoTable.previous.finalY + 30,
+        head: [['Ingrediente', 'Original', 'Otimizado', 'Diferença', 'Preço (R$/kg)']],
+        body: ingredientsData,
+        theme: 'grid',
+        headStyles: { fillColor: [52, 152, 219] }
+      });
+
+      // Salvar PDF
+      doc.save(`otimizacao_${currentRecipe.name.replace(/ /g, '_')}_${date.replace(/[/,:]/g, '-')}.pdf`);
+      showStatus("Relatório PDF gerado com sucesso!", 'success', 'optimization-status');
+    }
+
+    function exportToExcel() {
+      if (!optimizationResults) return;
+
+      // Preparar dados
+      const data = [];
+
+      // Cabeçalho
+      data.push(['Relatório de Otimização de Receita']);
+      data.push([`Receita: ${currentRecipe.name}`]);
+      data.push([`Data: ${new Date().toLocaleString()}`]);
+      data.push([]);
+
+      // Resultados
+      data.push(['Comparação Original vs Otimizado']);
+      data.push(['Parâmetro', 'Original', 'Otimizado', 'Diferença']);
+      data.push([
+        'Custo (R$)',
+        optimizationResults.original.cost.toFixed(2),
+        optimizationResults.optimized.cost.toFixed(2),
+        `${(optimizationResults.optimized.cost - optimizationResults.original.cost).toFixed(2)} (${optimizationResults.costReduction.toFixed(1)}%)`
+      ]);
+      data.push([
+        'Proteína (%)',
+        optimizationResults.original.protein.toFixed(1),
+        optimizationResults.optimized.protein.toFixed(1),
+        `${(optimizationResults.optimized.protein - optimizationResults.original.protein).toFixed(1)} (${optimizationResults.nutritionImprovement.toFixed(1)}%)`
+      ]);
+      data.push([
+        'Gordura (%)',
+        optimizationResults.original.fat.toFixed(1),
+        optimizationResults.optimized.fat.toFixed(1),
+        (optimizationResults.optimized.fat - optimizationResults.original.fat).toFixed(1)
+      ]);
+      data.push([
+        'Açúcar (%)',
+        optimizationResults.original.sugar.toFixed(1),
+        optimizationResults.optimized.sugar.toFixed(1),
+        (optimizationResults.optimized.sugar - optimizationResults.original.sugar).toFixed(1)
+      ]);
+
+      data.push([]);
+      data.push(['Composição dos Ingredientes']);
+      data.push(['Ingrediente', 'Original (%)', 'Otimizado (%)', 'Diferença', 'Preço (R$/kg)']);
+
+      optimizationResults.ingredients.forEach(ing => {
+        data.push([
+          ing.name,
+          ing.originalPercent.toFixed(1),
+          ing.optimizedPercent.toFixed(1),
+          (ing.optimizedPercent - ing.originalPercent).toFixed(1),
+          ing.price.toFixed(2)
+        ]);
+      });
+
+      // Criar planilha
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Otimização");
+
+      // Exportar
+      const date = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `otimizacao_${currentRecipe.name.replace(/ /g, '_')}_${date}.xlsx`);
+      showStatus("Planilha Excel gerada com sucesso!", 'success', 'optimization-status');
+    }
+
+    // Funções de análise de sensibilidade
+    function runSensitivityAnalysis() {
+      const param = document.getElementById('sensitivity-parameter').value;
+      const min = parseFloat(document.getElementById('sensitivity-min').value);
+      const max = parseFloat(document.getElementById('sensitivity-max').value);
+      const steps = parseInt(document.getElementById('sensitivity-steps').value);
+
+      const ingredientRows = document.querySelectorAll('.ingredient-row');
+      const ingredients = [];
+
+      ingredientRows.forEach(row => {
+        const id = row.id.split('-')[1];
+        const name = document.getElementById(`ing-name-${id}`).value;
+        const quantity = parseFloat(document.getElementById(`ing-qty-${id}`).value) || 0;
+        const price = parseFloat(document.getElementById(`ing-price-${id}`).value) || 0;
+        const protein = parseFloat(document.getElementById(`ing-protein-${id}`).value) / 100 || 0;
+        const fat = parseFloat(document.getElementById(`ing-fat-${id}`).value) / 100 || 0;
+        const sugar = parseFloat(document.getElementById(`ing-sugar-${id}`).value) / 100 || 0;
+
+        if (name && quantity > 0) {
+          ingredients.push({
+            name, quantity, price, protein, fat, sugar
+          });
+        }
+      });
+
+      if (ingredients.length < 2) {
+        showStatus("Primeiro crie uma receita com pelo menos 2 ingredientes", 'error', 'sensitivity-status');
+        return;
+      }
+
+      if (min >= max) {
+        showStatus("O valor mínimo deve ser menor que o máximo", 'error', 'sensitivity-status');
+        return;
+      }
+
+      const stepSize = (max - min) / (steps - 1);
+      const results = [];
+
+      document.getElementById('sensitivity-status').innerHTML =
+        `<div class="status">Calculando análise... <span class="loading"></span></div>`;
+
+      // Simular cálculo assíncrono
+      setTimeout(() => {
+        try {
+          for (let i = 0; i < steps; i++) {
+            const value = min + (i * stepSize);
+            const constraints = {
+              protein: parseFloat(document.getElementById('min-protein').value) / 100 || 0,
+              fat: parseFloat(document.getElementById('max-fat').value) / 100 || 100,
+              sugar: parseFloat(document.getElementById('max-sugar').value) / 100 || 100,
+              sodium: parseFloat(document.getElementById('max-sodium').value) || Infinity,
+              cost: parseFloat(document.getElementById('max-cost').value) || Infinity
+            };
+
+            // Atualizar a restrição que estamos analisando
+            if (param === 'sodium') {
+              constraints.sodium = value;
+            } else if (param === 'cost') {
+              constraints.cost = value;
+            } else {
+              constraints[param] = value / 100;
+            }
+
+            // Simular otimização
+            const optimization = simulateOptimization(ingredients, 'balance', constraints);
+
+            results.push({
+              parameter: param,
+              value: value,
+              cost: optimization.optimized.cost,
+              protein: optimization.optimized.protein,
+              fat: optimization.optimized.fat,
+              sugar: optimization.optimized.sugar
+            });
+          }
+
+          sensitivityResults = results;
+          displaySensitivityResults(results, param);
+          document.getElementById('export-sensitivity-btn').style.display = 'inline-block';
+          showStatus("Análise de sensibilidade concluída!", 'success', 'sensitivity-status');
+        } catch (error) {
+          showStatus(`Erro na análise: ${error.message}`, 'error', 'sensitivity-status');
+        }
+      }, 500);
+    }
+
+    function displaySensitivityResults(results, param) {
+      // Configurar nome do parâmetro para exibição
+      const paramName = {
+        protein: 'Proteína Mínima (%)',
+        fat: 'Gordura Máxima (%)',
+        sugar: 'Açúcar Máximo (%)',
+        sodium: 'Sódio Máximo (mg/100g)',
+        cost: 'Custo Máximo (R$/kg)'
+      }[param];
+
+      // Gráfico
+      const ctx = document.getElementById('sensitivity-chart');
+      ctx.innerHTML = '';
+      const canvas = document.createElement('canvas');
+      ctx.appendChild(canvas);
+
+      new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: results.map(r => r.value.toFixed(param === 'sodium' ? 0 : 1)),
+          datasets: [
+            {
+              label: 'Custo (R$)',
+              data: results.map(r => r.cost),
+              borderColor: 'rgb(75, 192, 192)',
+              backgroundColor: 'rgba(75, 192, 192, 0.1)',
+              tension: 0.1,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Proteína (%)',
+              data: results.map(r => r.protein),
+              borderColor: 'rgb(54, 162, 235)',
+              backgroundColor: 'rgba(54, 162, 235, 0.1)',
+              tension: 0.1,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: paramName
+              }
+            },
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: 'Custo (R$)'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: 'Proteína (%)'
+              },
+              grid: {
+                drawOnChartArea: false
+              }
+            }
+          }
+        }
+      });
+
+      // Tabela de resultados
+      let html = `
+                <h3>Resultados Detalhados</h3><table><tr><th>${paramName}</th><th>Custo (R$)</th><th>Proteína (%)</th><th>Gordura (%)</th><th>Açúcar (%)</th></tr>
+            `;
+
+      results.forEach(r => {
+        html += `
+                    <tr><td>${r.value.toFixed(param === 'sodium' ? 0 : 1)}</td><td>${r.cost.toFixed(2)}</td><td>${r.protein.toFixed(1)}</td><td>${r.fat.toFixed(1)}</td><td>${r.sugar.toFixed(1)}</td></tr>
+                `;
+      });
+
+      html += `</table>`;
+      document.getElementById('sensitivity-results').innerHTML = html;
+    }
+
+    function exportSensitivityData() {
+      if (!sensitivityResults) return;
+
+      const param = document.getElementById('sensitivity-parameter').value;
+      const paramName = {
+        protein: 'proteina',
+        fat: 'gordura',
+        sugar: 'acucar',
+        sodium: 'sodio',
+        cost: 'custo'
+      }[param];
+
+      // Preparar dados
+      const data = [];
+
+      // Cabeçalho
+      data.push(['Análise de Sensibilidade']);
+      data.push([`Receita: ${currentRecipe.name}`]);
+      data.push([`Parâmetro: ${paramName}`]);
+      data.push([`Data: ${new Date().toLocaleString()}`]);
+      data.push([]);
+
+      // Resultados
+      data.push(['Valor', 'Custo (R$)', 'Proteína (%)', 'Gordura (%)', 'Açúcar (%)']);
+
+      sensitivityResults.forEach(r => {
+        data.push([
+          r.value.toFixed(param === 'sodium' ? 0 : 1),
+          r.cost.toFixed(2),
+          r.protein.toFixed(1),
+          r.fat.toFixed(1),
+          r.sugar.toFixed(1)
+        ]);
+      });
+
+      // Criar planilha
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sensibilidade");
+
+      // Exportar
+      const date = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `sensibilidade_${paramName}_${date}.xlsx`);
+      showStatus("Dados de sensibilidade exportados!", 'success', 'sensitivity-status');
+    }
+
+    // Funções de cálculo de preço de venda
+    function calculateSellingPrice() {
+      const productionCost = parseFloat(document.getElementById('production-cost').value);
+      const desiredMargin = parseFloat(document.getElementById('desired-margin').value) / 100;
+      const taxes = parseFloat(document.getElementById('taxes').value) / 100;
+      const packagingCost = parseFloat(document.getElementById('packaging-cost').value);
+      const productWeight = parseFloat(document.getElementById('product-weight').value);
+
+      if (isNaN(productionCost) || productionCost <= 0) {
+        showStatus("Informe um custo de produção válido", 'error', 'price-status');
+        return;
+      }
+
+      // Calcular custo por unidade (convertendo kg para g)
+      const costPerUnit = (productionCost * productWeight / 1000) + packagingCost;
+
+      // Calcular preço de venda
+      const sellingPrice = costPerUnit * (1 + desiredMargin) / (1 - taxes);
+
+      // Exibir resultados
+      displayPriceResults({
+        productionCost,
+        desiredMargin: desiredMargin * 100,
+        taxes: taxes * 100,
+        packagingCost,
+        productWeight,
+        costPerUnit,
+        sellingPrice
+      });
+
+      showStatus("Cálculo realizado com sucesso!", 'success', 'price-status');
+    }
+
+    function displayPriceResults(results) {
+      // Tabela de resultados
+      let html = `
+                <h3>Detalhes do Cálculo</h3><table><tr><th>Parâmetro</th><th>Valor</th></tr><tr><td>Custo de Produção (R$/kg)</td><td>R$ ${results.productionCost.toFixed(2)}</td></tr><tr><td>Margem de Lucro Desejada</td><td>${results.desiredMargin.toFixed(1)}%</td></tr><tr><td>Impostos e Taxas</td><td>${results.taxes.toFixed(1)}%</td></tr><tr><td>Custo de Embalagem</td><td>R$ ${results.packagingCost.toFixed(2)} por unidade</td></tr><tr><td>Peso do Produto</td><td>${results.productWeight}g por unidade</td></tr><tr><td><strong>Custo por Unidade</strong></td><td><strong>R$ ${results.costPerUnit.toFixed(2)}</strong></td></tr><tr><td><strong>Preço de Venda Sugerido</strong></td><td><strong>R$ ${results.sellingPrice.toFixed(2)} por unidade</strong></td></tr></table>
+
+                <h3>Margem de Lucro em Diferentes Preços de Venda</h3><table><tr><th>Preço de Venda (R$)</th><th>Lucro por Unidade (R$)</th><th>Margem de Lucro (%)</th></tr>
+            `;
+
+      // Calcular diferentes cenários
+      const basePrice = results.sellingPrice;
+      for (let i = -4; i <= 4; i++) {
+        const price = basePrice + (i * 0.5);
+        if (price <= 0) continue;
+
+        const profit = price * (1 - results.taxes / 100) - results.costPerUnit;
+        const margin = (profit / (price * (1 - results.taxes / 100))) * 100;
+
+        html += `
+                    <tr ${i === 0 ? 'style="background-color: #e8f4fc;"' : ''}>
+                        <td>${price.toFixed(2)}</td><td>${profit.toFixed(2)}</td><td>${margin.toFixed(1)}%</td></tr>
+                `;
+      }
+
+      html += `</table>`;
+      document.getElementById('price-results').innerHTML = html;
+
+      // Gráfico
+      const ctx = document.getElementById('price-chart');
+      ctx.innerHTML = '';
+      const canvas = document.createElement('canvas');
+      ctx.appendChild(canvas);
+
+      // Preparar dados para o gráfico
+      const prices = [];
+      const profits = [];
+      const margins = [];
+
+      for (let price = basePrice * 0.7; price <= basePrice * 1.3; price += basePrice * 0.05) {
+        const profit = price * (1 - results.taxes / 100) - results.costPerUnit;
+        const margin = (profit / (price * (1 - results.taxes / 100))) * 100;
+
+        prices.push(price.toFixed(2));
+        profits.push(profit);
+        margins.push(margin);
+      }
+
+      new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: prices,
+          datasets: [
+            {
+              label: 'Lucro por Unidade (R$)',
+              data: profits,
+              borderColor: 'rgb(75, 192, 192)',
+              backgroundColor: 'rgba(75, 192, 192, 0.1)',
+              yAxisID: 'y',
+              tension: 0.1
+            },
+            {
+              label: 'Margem de Lucro (%)',
+              data: margins,
+              borderColor: 'rgb(54, 162, 235)',
+              backgroundColor: 'rgba(54, 162, 235, 0.1)',
+              yAxisID: 'y1',
+              tension: 0.1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.datasetIndex === 0) {
+                    label += 'R$ ' + context.parsed.y.toFixed(2);
+                  } else {
+                    label += context.parsed.y.toFixed(1) + '%';
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Preço de Venda (R$)'
+              }
+            },
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: 'Lucro por Unidade (R$)'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: 'Margem de Lucro (%)'
+              },
+              grid: {
+                drawOnChartArea: false
+              },
+              min: 0,
+              max: 100
+            }
+          }
+        }
+      });
+
+      document.getElementById('export-price-btn').style.display = 'inline-block';
+    }
+
+    function exportPriceData() {
+      const productionCost = parseFloat(document.getElementById('production-cost').value);
+      const desiredMargin = parseFloat(document.getElementById('desired-margin').value) / 100;
+      const taxes = parseFloat(document.getElementById('taxes').value) / 100;
+      const packagingCost = parseFloat(document.getElementById('packaging-cost').value);
+      const productWeight = parseFloat(document.getElementById('product-weight').value);
+
+      if (isNaN(productionCost)) return;
+
+      // Calcular custo por unidade (convertendo kg para g)
+      const costPerUnit = (productionCost * productWeight / 1000) + packagingCost;
+
+      // Calcular preço de venda
+      const sellingPrice = costPerUnit * (1 + desiredMargin) / (1 - taxes);
+
+      // Preparar dados
+      const data = [];
+
+      // Cabeçalho
+      data.push(['Cálculo de Preço de Venda']);
+      data.push([`Receita: ${currentRecipe.name || 'N/A'}`]);
+      data.push([`Data: ${new Date().toLocaleString()}`]);
+      data.push([]);
+
+      // Resultados principais
+      data.push(['Parâmetro', 'Valor']);
+      data.push(['Custo de Produção (R$/kg)', productionCost.toFixed(2)]);
+      data.push(['Margem de Lucro Desejada (%)', (desiredMargin * 100).toFixed(1)]);
+      data.push(['Impostos e Taxas (%)', (taxes * 100).toFixed(1)]);
+      data.push(['Custo de Embalagem (R$/unidade)', packagingCost.toFixed(2)]);
+      data.push(['Peso do Produto (g/unidade)', productWeight]);
+      data.push(['Custo por Unidade (R$)', costPerUnit.toFixed(2)]);
+      data.push(['Preço de Venda Sugerido (R$)', sellingPrice.toFixed(2)]);
+
+      data.push([]);
+      data.push(['Análise de Margem em Diferentes Preços']);
+      data.push(['Preço de Venda (R$)', 'Lucro por Unidade (R$)', 'Margem de Lucro (%)']);
+
+      // Dados detalhados
+      const basePrice = sellingPrice;
+      for (let price = basePrice * 0.7; price <= basePrice * 1.3; price += basePrice * 0.05) {
+        const profit = price * (1 - taxes) - costPerUnit;
+        const margin = (profit / (price * (1 - taxes))) * 100;
+
+        data.push([
+          price.toFixed(2),
+          profit.toFixed(2),
+          margin.toFixed(1)
+        ]);
+      }
+
+      // Criar planilha
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Preço de Venda");
+
+      // Exportar
+      const date = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `preco_venda_${currentRecipe.name ? currentRecipe.name.replace(/ /g, '_') : 'receita'}_${date}.xlsx`);
+      showStatus("Dados de preço de venda exportados!", 'success', 'price-status');
+    }
+  </script>
+</body>
+
+</html>
